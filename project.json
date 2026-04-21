@@ -1,0 +1,21 @@
+{
+  "overview": "A cozy rainy day website featuring atmospheric imagery, tabbed links to curated external resources, and an AI-powered chat assistant available to all visitors — the perfect companion for a stormy day indoors.",
+  "features": [
+    "Rainy day themed hero and image gallery",
+    "Tabbed navigation with curated external resource links",
+    "AI-powered chat assistant (no login required)",
+    "Dark mode default with light mode toggle",
+    "Fully responsive design"
+  ],
+  "category": "lifestyle",
+  "tags": [
+    "rainy-day",
+    "activity-finder",
+    "ai-assistant",
+    "gallery",
+    "links",
+    "cozy",
+    "ambient"
+  ],
+  "last_updated": "2026-04-21T20:20:40.665Z"
+}
