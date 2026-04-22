@@ -4,7 +4,9 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAiChat } from "@/hooks/useAiChat";
+import { useFavorites } from "@/hooks/useFavorites";
 import type { ExternalLink as ExternalLinkType, TabCategory } from "@/types";
+import { useInternetIdentity } from "@caffeineai/core-infrastructure";
 import {
   BookOpen,
   Bot,
@@ -12,8 +14,11 @@ import {
   ExternalLink,
   Globe,
   Loader2,
+  LogIn,
   Music,
   Send,
+  Star,
+  Trash2,
 } from "lucide-react";
 import { motion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
@@ -111,6 +116,8 @@ const LINKS: ExternalLinkType[] = [
   },
 ];
 
+type ExtendedTab = TabCategory | "favorites";
+
 const TAB_CONFIG: {
   value: TabCategory;
   label: string;
@@ -134,7 +141,21 @@ const TAB_CONFIG: {
   },
 ];
 
-function LinkCard({ link, index }: { link: ExternalLinkType; index: number }) {
+interface LinkCardProps {
+  link: ExternalLinkType;
+  index: number;
+  isFavorited: boolean;
+  isAuthenticated: boolean;
+  onStarClick: () => void;
+}
+
+function LinkCard({
+  link,
+  index,
+  isFavorited,
+  isAuthenticated,
+  onStarClick,
+}: LinkCardProps) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -156,9 +177,32 @@ function LinkCard({ link, index }: { link: ExternalLinkType; index: number }) {
               />
             </div>
             <div className="flex-1 p-4 flex flex-col gap-2 min-w-0">
-              <h3 className="font-display font-semibold text-sm text-foreground leading-tight line-clamp-2 group-hover:text-accent transition-colors duration-200">
-                {link.title}
-              </h3>
+              <div className="flex items-start gap-2 min-w-0">
+                <h3 className="font-display font-semibold text-sm text-foreground leading-tight line-clamp-2 group-hover:text-accent transition-colors duration-200 flex-1 min-w-0">
+                  {link.title}
+                </h3>
+                <button
+                  type="button"
+                  onClick={onStarClick}
+                  aria-label={
+                    isAuthenticated
+                      ? isFavorited
+                        ? "Remove from favorites"
+                        : "Add to favorites"
+                      : "Log in to save favorites"
+                  }
+                  data-ocid={`links.favorite_button.${index + 1}`}
+                  className={`shrink-0 transition-colors duration-200 mt-0.5 ${
+                    isFavorited
+                      ? "text-accent"
+                      : "text-muted-foreground/40 hover:text-accent/60"
+                  }`}
+                >
+                  <Star
+                    className={`w-4 h-4 ${isFavorited ? "fill-accent" : ""}`}
+                  />
+                </button>
+              </div>
               <p className="text-xs text-muted-foreground line-clamp-2 font-body leading-relaxed">
                 {link.description}
               </p>
@@ -199,9 +243,11 @@ function LinkCard({ link, index }: { link: ExternalLinkType; index: number }) {
 }
 
 function ChatPanel() {
-  const { messages, sendMessage, isLoading } = useAiChat();
+  const { messages, sendMessage, isLoading, clearHistory, isAuthenticated } =
+    useAiChat();
   const [input, setInput] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const hasHistory = messages.filter((m) => m.id !== "welcome").length > 0;
 
   // Scroll to bottom when new messages arrive
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -270,6 +316,22 @@ function ChatPanel() {
         <div ref={messagesEndRef} />
       </div>
 
+      {/* Clear history button — only when logged in and history exists */}
+      {isAuthenticated && hasHistory && (
+        <div className="px-3 pb-1 flex justify-end">
+          <button
+            type="button"
+            onClick={clearHistory}
+            data-ocid="chat.clear_history_button"
+            className="flex items-center gap-1 text-xs text-muted-foreground/60 hover:text-destructive transition-colors duration-200"
+            aria-label="Clear chat history"
+          >
+            <Trash2 className="w-3 h-3" />
+            Clear history
+          </button>
+        </div>
+      )}
+
       {/* Input */}
       <div className="p-3 border-t border-border bg-card/50 flex gap-2">
         <Input
@@ -277,6 +339,7 @@ function ChatPanel() {
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder="Ask Rain-Bot anything…"
+          aria-label="Chat with Rain-Bot"
           className="flex-1 text-sm bg-background border-input focus-visible:ring-accent/50"
           data-ocid="chat.message_input"
           disabled={isLoading}
@@ -297,9 +360,32 @@ function ChatPanel() {
 }
 
 export default function Home() {
-  const [activeTab, setActiveTab] = useState<TabCategory>("articles");
+  const [activeTab, setActiveTab] = useState<ExtendedTab>("articles");
+  const { isAuthenticated, login } = useInternetIdentity();
+  const { favorites, isFavorited, toggleFavorite } = useFavorites();
 
-  const filteredLinks = LINKS.filter((l) => l.category === activeTab);
+  // Reset to a real tab if user logs out while on Favorites
+  useEffect(() => {
+    if (!isAuthenticated && activeTab === "favorites") {
+      setActiveTab("articles");
+    }
+  }, [isAuthenticated, activeTab]);
+
+  const filteredLinks =
+    activeTab === "favorites"
+      ? LINKS.filter((l) => favorites.includes(l.id))
+      : LINKS.filter((l) => l.category === activeTab);
+
+  // Show favorites tab when authenticated OR when user has favorites
+  const showFavoritesTab = isAuthenticated || favorites.length > 0;
+
+  const handleStarClick = (linkId: string) => {
+    if (!isAuthenticated) {
+      login();
+      return;
+    }
+    toggleFavorite(linkId);
+  };
 
   return (
     <>
@@ -364,10 +450,12 @@ export default function Home() {
               <div id="articles" />
               <Tabs
                 value={activeTab}
-                onValueChange={(v) => setActiveTab(v as TabCategory)}
+                onValueChange={(v) => setActiveTab(v as ExtendedTab)}
                 data-ocid="content.tabs"
               >
-                <TabsList className="mb-6 bg-muted/60 border border-border w-full sm:w-auto grid grid-cols-4 sm:flex">
+                <TabsList
+                  className={`mb-6 bg-muted/60 border border-border w-full sm:w-auto grid sm:flex ${showFavoritesTab ? "grid-cols-5" : "grid-cols-4"}`}
+                >
                   {TAB_CONFIG.map((tab) => (
                     <TabsTrigger
                       key={tab.value}
@@ -380,6 +468,23 @@ export default function Home() {
                       <span className="hidden sm:inline">{tab.label}</span>
                     </TabsTrigger>
                   ))}
+
+                  {/* Favorites tab */}
+                  {showFavoritesTab && (
+                    <TabsTrigger
+                      value="favorites"
+                      className="flex items-center gap-1.5 text-xs sm:text-sm data-[state=active]:text-accent data-[state=active]:border-b-2 data-[state=active]:border-accent"
+                      data-ocid="content.favorites_tab"
+                    >
+                      <Star className="w-3.5 h-3.5" />
+                      <span className="hidden sm:inline">Favorites</span>
+                      {favorites.length > 0 && (
+                        <span className="hidden sm:inline text-xs bg-accent/20 text-accent rounded-full px-1.5 min-w-[1.25rem] text-center leading-5">
+                          {favorites.length}
+                        </span>
+                      )}
+                    </TabsTrigger>
+                  )}
                 </TabsList>
 
                 {TAB_CONFIG.map((tab) => (
@@ -400,12 +505,73 @@ export default function Home() {
                     ) : (
                       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
                         {filteredLinks.map((link, i) => (
-                          <LinkCard key={link.id} link={link} index={i} />
+                          <LinkCard
+                            key={link.id}
+                            link={link}
+                            index={i}
+                            isFavorited={isFavorited(link.id)}
+                            isAuthenticated={isAuthenticated}
+                            onStarClick={() => handleStarClick(link.id)}
+                          />
                         ))}
                       </div>
                     )}
                   </TabsContent>
                 ))}
+
+                {/* Favorites tab content */}
+                {showFavoritesTab && (
+                  <TabsContent value="favorites" className="mt-0">
+                    {filteredLinks.length === 0 ? (
+                      <div
+                        className="text-center py-16"
+                        data-ocid="favorites.empty_state"
+                      >
+                        {isAuthenticated ? (
+                          <>
+                            <Star className="w-10 h-10 text-muted-foreground/30 mx-auto mb-3" />
+                            <p className="font-body text-muted-foreground mb-1">
+                              No favorites yet
+                            </p>
+                            <p className="text-sm text-muted-foreground/60">
+                              Click the ☆ star on any link to save it here.
+                            </p>
+                          </>
+                        ) : (
+                          <>
+                            <Star className="w-10 h-10 text-muted-foreground/30 mx-auto mb-3" />
+                            <p className="font-body text-muted-foreground mb-3">
+                              Log in to save and see your favorites
+                            </p>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={login}
+                              data-ocid="favorites.login_button"
+                              className="gap-2 border-accent/30 text-accent hover:bg-accent/10"
+                            >
+                              <LogIn className="w-4 h-4" />
+                              Log in
+                            </Button>
+                          </>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+                        {filteredLinks.map((link, i) => (
+                          <LinkCard
+                            key={link.id}
+                            link={link}
+                            index={i}
+                            isFavorited={isFavorited(link.id)}
+                            isAuthenticated={isAuthenticated}
+                            onStarClick={() => handleStarClick(link.id)}
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </TabsContent>
+                )}
               </Tabs>
             </div>
 

@@ -10,6 +10,12 @@ import { IDL } from '@icp-sdk/core/candid';
 
 export const ChatRequest = IDL.Record({ 'message' : IDL.Text });
 export const ChatResponse = IDL.Record({ 'reply' : IDL.Text });
+export const ChatHistoryEntry = IDL.Record({
+  'id' : IDL.Text,
+  'content' : IDL.Text,
+  'role' : IDL.Text,
+  'timestamp' : IDL.Int,
+});
 export const http_header = IDL.Record({
   'value' : IDL.Text,
   'name' : IDL.Text,
@@ -30,7 +36,13 @@ export const TransformationOutput = IDL.Record({
 });
 
 export const idlService = IDL.Service({
+  'addFavorite' : IDL.Func([IDL.Text], [], []),
   'chat' : IDL.Func([ChatRequest], [ChatResponse], []),
+  'clearChatHistory' : IDL.Func([], [], []),
+  'getChatHistory' : IDL.Func([], [IDL.Vec(ChatHistoryEntry)], []),
+  'getFavorites' : IDL.Func([], [IDL.Vec(IDL.Text)], []),
+  'removeFavorite' : IDL.Func([IDL.Text], [], []),
+  'saveChatMessage' : IDL.Func([ChatHistoryEntry], [], []),
   'transform' : IDL.Func(
       [TransformationInput],
       [TransformationOutput],
@@ -43,6 +55,12 @@ export const idlInitArgs = [];
 export const idlFactory = ({ IDL }) => {
   const ChatRequest = IDL.Record({ 'message' : IDL.Text });
   const ChatResponse = IDL.Record({ 'reply' : IDL.Text });
+  const ChatHistoryEntry = IDL.Record({
+    'id' : IDL.Text,
+    'content' : IDL.Text,
+    'role' : IDL.Text,
+    'timestamp' : IDL.Int,
+  });
   const http_header = IDL.Record({ 'value' : IDL.Text, 'name' : IDL.Text });
   const http_request_result = IDL.Record({
     'status' : IDL.Nat,
@@ -60,7 +78,13 @@ export const idlFactory = ({ IDL }) => {
   });
   
   return IDL.Service({
+    'addFavorite' : IDL.Func([IDL.Text], [], []),
     'chat' : IDL.Func([ChatRequest], [ChatResponse], []),
+    'clearChatHistory' : IDL.Func([], [], []),
+    'getChatHistory' : IDL.Func([], [IDL.Vec(ChatHistoryEntry)], []),
+    'getFavorites' : IDL.Func([], [IDL.Vec(IDL.Text)], []),
+    'removeFavorite' : IDL.Func([IDL.Text], [], []),
+    'saveChatMessage' : IDL.Func([ChatHistoryEntry], [], []),
     'transform' : IDL.Func(
         [TransformationInput],
         [TransformationOutput],

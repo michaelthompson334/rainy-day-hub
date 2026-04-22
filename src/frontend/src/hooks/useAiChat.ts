@@ -1,5 +1,9 @@
+import { createActor } from "@/backend";
+import type { ChatHistoryEntry } from "@/backend";
 import type { ChatMessage } from "@/types";
-import { useCallback, useState } from "react";
+import { useActor } from "@caffeineai/core-infrastructure";
+import { useInternetIdentity } from "@caffeineai/core-infrastructure";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 function generateId(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
@@ -20,50 +24,121 @@ const RAIN_BOT_RESPONSES = [
 
 let responseIndex = 0;
 
+const WELCOME_MESSAGE: ChatMessage = {
+  id: "welcome",
+  role: "assistant",
+  content:
+    "Hello! I'm Rain-Bot, your cozy companion for rainy days. 🌧️ Ask me anything — about rain, what to do on a rainy day, or just chat!",
+  timestamp: Date.now(),
+};
+
+function entryToMessage(entry: ChatHistoryEntry): ChatMessage {
+  return {
+    id: entry.id,
+    role: entry.role === "user" ? "user" : "assistant",
+    content: entry.content,
+    timestamp: Number(entry.timestamp),
+  };
+}
+
 export function useAiChat() {
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    {
-      id: "welcome",
-      role: "assistant",
-      content:
-        "Hello! I'm Rain-Bot, your cozy companion for rainy days. 🌧️ Ask me anything — about rain, what to do on a rainy day, or just chat!",
-      timestamp: Date.now(),
-    },
-  ]);
+  const { actor, isFetching } = useActor(createActor);
+  const { isAuthenticated } = useInternetIdentity();
+  const [messages, setMessages] = useState<ChatMessage[]>([WELCOME_MESSAGE]);
   const [isLoading, setIsLoading] = useState(false);
+  const historyLoadedRef = useRef(false);
 
-  const sendMessage = useCallback(async (content: string) => {
-    if (!content.trim()) return;
+  // Load persisted chat history for authenticated users on mount
+  useEffect(() => {
+    if (!isAuthenticated || !actor || isFetching || historyLoadedRef.current)
+      return;
+    historyLoadedRef.current = true;
 
-    const userMessage: ChatMessage = {
-      id: generateId(),
-      role: "user",
-      content: content.trim(),
-      timestamp: Date.now(),
-    };
+    actor
+      .getChatHistory()
+      .then((entries) => {
+        if (entries.length === 0) return;
+        const historical = entries.map(entryToMessage);
+        setMessages([WELCOME_MESSAGE, ...historical]);
+      })
+      .catch(() => {
+        // silently ignore — history is optional
+      });
+  }, [isAuthenticated, actor, isFetching]);
 
-    setMessages((prev) => [...prev, userMessage]);
-    setIsLoading(true);
+  // Reset history loaded flag when user logs out
+  useEffect(() => {
+    if (!isAuthenticated) {
+      historyLoadedRef.current = false;
+      setMessages([WELCOME_MESSAGE]);
+    }
+  }, [isAuthenticated]);
 
-    // Simulate a thoughtful response delay
-    await new Promise((resolve) =>
-      setTimeout(resolve, 800 + Math.random() * 700),
-    );
+  const sendMessage = useCallback(
+    async (content: string) => {
+      if (!content.trim()) return;
 
-    const response =
-      RAIN_BOT_RESPONSES[responseIndex % RAIN_BOT_RESPONSES.length];
-    responseIndex++;
+      const userMessage: ChatMessage = {
+        id: generateId(),
+        role: "user",
+        content: content.trim(),
+        timestamp: Date.now(),
+      };
 
-    const assistantMessage: ChatMessage = {
-      id: generateId(),
-      role: "assistant",
-      content: response,
-      timestamp: Date.now(),
-    };
+      setMessages((prev) => [...prev, userMessage]);
+      setIsLoading(true);
 
-    setMessages((prev) => [...prev, assistantMessage]);
-    setIsLoading(false);
-  }, []);
+      // Persist user message for logged-in users
+      if (actor && isAuthenticated) {
+        actor
+          .saveChatMessage({
+            id: userMessage.id,
+            role: "user",
+            content: userMessage.content,
+            timestamp: BigInt(userMessage.timestamp),
+          })
+          .catch(() => {});
+      }
 
-  return { messages, sendMessage, isLoading };
+      // Simulate a thoughtful response delay
+      await new Promise((resolve) =>
+        setTimeout(resolve, 800 + Math.random() * 700),
+      );
+
+      const response =
+        RAIN_BOT_RESPONSES[responseIndex % RAIN_BOT_RESPONSES.length];
+      responseIndex++;
+
+      const assistantMessage: ChatMessage = {
+        id: generateId(),
+        role: "assistant",
+        content: response,
+        timestamp: Date.now(),
+      };
+
+      setMessages((prev) => [...prev, assistantMessage]);
+      setIsLoading(false);
+
+      // Persist assistant message for logged-in users
+      if (actor && isAuthenticated) {
+        actor
+          .saveChatMessage({
+            id: assistantMessage.id,
+            role: "assistant",
+            content: assistantMessage.content,
+            timestamp: BigInt(assistantMessage.timestamp),
+          })
+          .catch(() => {});
+      }
+    },
+    [actor, isAuthenticated],
+  );
+
+  const clearHistory = useCallback(async () => {
+    if (!actor || !isAuthenticated) return;
+    await actor.clearChatHistory();
+    setMessages([WELCOME_MESSAGE]);
+  }, [actor, isAuthenticated]);
+
+  return { messages, sendMessage, isLoading, clearHistory, isAuthenticated };
 }

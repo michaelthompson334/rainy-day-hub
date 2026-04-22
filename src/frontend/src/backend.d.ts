@@ -7,17 +7,23 @@ export interface None {
     __kind__: "None";
 }
 export type Option<T> = Some<T> | None;
-export interface TransformationInput {
-    context: Uint8Array;
-    response: http_request_result;
-}
-export interface ChatRequest {
-    message: string;
+export interface ChatHistoryEntry {
+    id: string;
+    content: string;
+    role: string;
+    timestamp: bigint;
 }
 export interface TransformationOutput {
     status: bigint;
     body: Uint8Array;
     headers: Array<http_header>;
+}
+export interface ChatRequest {
+    message: string;
+}
+export interface TransformationInput {
+    context: Uint8Array;
+    response: http_request_result;
 }
 export interface ChatResponse {
     reply: string;
@@ -32,6 +38,12 @@ export interface http_request_result {
     headers: Array<http_header>;
 }
 export interface backendInterface {
+    addFavorite(linkId: string): Promise<void>;
     chat(request: ChatRequest): Promise<ChatResponse>;
+    clearChatHistory(): Promise<void>;
+    getChatHistory(): Promise<Array<ChatHistoryEntry>>;
+    getFavorites(): Promise<Array<string>>;
+    removeFavorite(linkId: string): Promise<void>;
+    saveChatMessage(entry: ChatHistoryEntry): Promise<void>;
     transform(input: TransformationInput): Promise<TransformationOutput>;
 }

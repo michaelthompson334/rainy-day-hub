@@ -10,6 +10,12 @@ import type { ActorMethod } from '@icp-sdk/core/agent';
 import type { IDL } from '@icp-sdk/core/candid';
 import type { Principal } from '@icp-sdk/core/principal';
 
+export interface ChatHistoryEntry {
+  'id' : string,
+  'content' : string,
+  'role' : string,
+  'timestamp' : bigint,
+}
 export interface ChatRequest { 'message' : string }
 export interface ChatResponse { 'reply' : string }
 export interface TransformationInput {
@@ -28,7 +34,13 @@ export interface http_request_result {
   'headers' : Array<http_header>,
 }
 export interface _SERVICE {
+  'addFavorite' : ActorMethod<[string], undefined>,
   'chat' : ActorMethod<[ChatRequest], ChatResponse>,
+  'clearChatHistory' : ActorMethod<[], undefined>,
+  'getChatHistory' : ActorMethod<[], Array<ChatHistoryEntry>>,
+  'getFavorites' : ActorMethod<[], Array<string>>,
+  'removeFavorite' : ActorMethod<[string], undefined>,
+  'saveChatMessage' : ActorMethod<[ChatHistoryEntry], undefined>,
   'transform' : ActorMethod<[TransformationInput], TransformationOutput>,
 }
 export declare const idlService: IDL.ServiceClass;

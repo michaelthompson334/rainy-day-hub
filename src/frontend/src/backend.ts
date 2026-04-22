@@ -89,17 +89,23 @@ export class ExternalBlob {
         return this;
     }
 }
-export interface TransformationInput {
-    context: Uint8Array;
-    response: http_request_result;
-}
-export interface ChatRequest {
-    message: string;
+export interface ChatHistoryEntry {
+    id: string;
+    content: string;
+    role: string;
+    timestamp: bigint;
 }
 export interface TransformationOutput {
     status: bigint;
     body: Uint8Array;
     headers: Array<http_header>;
+}
+export interface ChatRequest {
+    message: string;
+}
+export interface TransformationInput {
+    context: Uint8Array;
+    response: http_request_result;
 }
 export interface ChatResponse {
     reply: string;
@@ -114,11 +120,31 @@ export interface http_request_result {
     headers: Array<http_header>;
 }
 export interface backendInterface {
+    addFavorite(linkId: string): Promise<void>;
     chat(request: ChatRequest): Promise<ChatResponse>;
+    clearChatHistory(): Promise<void>;
+    getChatHistory(): Promise<Array<ChatHistoryEntry>>;
+    getFavorites(): Promise<Array<string>>;
+    removeFavorite(linkId: string): Promise<void>;
+    saveChatMessage(entry: ChatHistoryEntry): Promise<void>;
     transform(input: TransformationInput): Promise<TransformationOutput>;
 }
 export class Backend implements backendInterface {
     constructor(private actor: ActorSubclass<_SERVICE>, private _uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, private _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, private processError?: (error: unknown) => never){}
+    async addFavorite(arg0: string): Promise<void> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.addFavorite(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.addFavorite(arg0);
+            return result;
+        }
+    }
     async chat(arg0: ChatRequest): Promise<ChatResponse> {
         if (this.processError) {
             try {
@@ -130,6 +156,76 @@ export class Backend implements backendInterface {
             }
         } else {
             const result = await this.actor.chat(arg0);
+            return result;
+        }
+    }
+    async clearChatHistory(): Promise<void> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.clearChatHistory();
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.clearChatHistory();
+            return result;
+        }
+    }
+    async getChatHistory(): Promise<Array<ChatHistoryEntry>> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getChatHistory();
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getChatHistory();
+            return result;
+        }
+    }
+    async getFavorites(): Promise<Array<string>> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getFavorites();
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getFavorites();
+            return result;
+        }
+    }
+    async removeFavorite(arg0: string): Promise<void> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.removeFavorite(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.removeFavorite(arg0);
+            return result;
+        }
+    }
+    async saveChatMessage(arg0: ChatHistoryEntry): Promise<void> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.saveChatMessage(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.saveChatMessage(arg0);
             return result;
         }
     }

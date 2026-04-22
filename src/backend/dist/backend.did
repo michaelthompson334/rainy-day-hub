@@ -22,7 +22,20 @@ type TransformationInput =
  };
 type ChatResponse = record {reply: text;};
 type ChatRequest = record {message: text;};
+type ChatHistoryEntry = 
+ record {
+   content: text;
+   id: text;
+   role: text;
+   timestamp: int;
+ };
 service : {
+  addFavorite: (linkId: text) -> ();
   chat: (request: ChatRequest) -> (ChatResponse);
+  clearChatHistory: () -> ();
+  getChatHistory: () -> (vec ChatHistoryEntry);
+  getFavorites: () -> (vec text);
+  removeFavorite: (linkId: text) -> ();
+  saveChatMessage: (entry: ChatHistoryEntry) -> ();
   transform: (input: TransformationInput) -> (TransformationOutput) query;
 }
